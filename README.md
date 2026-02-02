@@ -55,7 +55,7 @@ Go into your name registrar's configuration panel and add these records:
 
 **One-command installation:**
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/bugfloyd/dnstt-deploy/main/dnstt-deploy.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/squirtea/dnstt-deploy/main/dnstt-deploy.sh)
 ```
 
 This command will:
@@ -100,6 +100,11 @@ During the setup (option 1), you'll be prompted for:
 - Automatically detects SSH port (default: 22)
 - Perfect for secure shell access via DNS
 - Compatible with mobile apps
+
+**Shadowsocks Mode (Option 3)**
+- Sets up a local `shadowsocks-libev` server bound to `127.0.0.1` (default port 8388)
+- DNSTT tunnels DNS traffic to the Shadowsocks server so clients can run `ss-local` locally and send encrypted traffic through the tunnel
+- Server config path: `/etc/shadowsocks-libev/config.json` (script sets `"mode": "tcp_only"` to avoid UDP handshake issues)
 
 ### MTU Settings
 - **Default**: 1232 bytes
@@ -246,7 +251,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/bugfloyd/dnstt-deploy/main/dns
 To completely remove dnstt server and all its components:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/bugfloyd/dnstt-deploy/main/dnstt-deploy.sh) uninstall
+bash <(curl -Ls https://raw.githubusercontent.com/squirtea/dnstt-deploy/main/dnstt-deploy.sh) uninstall
 ```
 
 Or if the script is installed:
@@ -264,10 +269,6 @@ The uninstall process will:
 - Remove firewall rules (firewalld/ufw)
 - Remove the `dnstt` system user
 - Optionally remove the `dnstt-deploy` script itself (with confirmation)
-
-**Note**: If you installed Dante (dante-server) via package manager, you may want to remove it manually:
-- **RHEL-based** (dnf/yum): `sudo dnf remove dante-server` or `sudo yum remove dante-server`
-- **Debian-based** (apt): `sudo apt remove dante-server`
 
 ## Troubleshooting
 
@@ -315,6 +316,23 @@ curl --socks5 127.0.0.1:1080 http://httpbin.org/ip  # Test SOCKS proxy locally
 sudo cat /etc/danted.conf                           # Check Dante configuration
 ```
 
+**Shadowsocks / No logs / UDP errors**:
+
+- If `ss-server` shows "suspicious UDP packet" errors or you see no Shadowsocks logs, ensure the client traffic is properly routed through the dnstt tunnel (see the Shadowsocks Mode example above). The deploy script configures Shadowsocks to use TCP-only mode by default (`"mode": "tcp_only"`) because the DNS tunnel in this setup carries TCP traffic to the server-side `ss-server`.
+- Confirm `ss-server` is running and listening on `127.0.0.1:<port>` on the server:
+
+```bash
+ss -tlnp | grep ss-server
+journalctl -u shadowsocks-libev-server@config -f
+```
+
+If `ss-local` traffic isn't reaching `ss-server`, verify that `dnstt-server` is receiving and forwarding connections:
+
+```bash
+journalctl -u dnstt-server -f
+systemctl status dnstt-server
+```
+
 **Port Check**:
 ```bash
 sudo ss -tulnp | grep 5300  # Check dnstt-server port
@@ -352,14 +370,9 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ## Acknowledgments
 
 - [dnstt](https://dnstt.network) by David Fifield
+- [dnstt-deploy](https://github.com/bugfloyd/dnstt-deploy) by Yashar Hosseinpour
+- [slipstream-rust-deploy](https://github.com/AliRezaBeigy/slipstream-rust-deploy) by AliRezaBeigy
 - [Dante SOCKS server](https://www.inet.no/dante/) for SOCKS proxy functionality
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/bugfloyd/dnstt-deploy/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/bugfloyd/dnstt-deploy/discussions)
-- **Official project website**: [dnstt.network](https://dnstt.network)
-
 ---
 
 **Made with ❤️ for privacy and security**
