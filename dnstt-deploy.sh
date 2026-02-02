@@ -205,7 +205,7 @@ show_configuration_info() {
 
     echo ""
     echo -e "${BLUE}Configuration Details:${NC}"
-    echo -e "  Nameserver subdomain: ${YELLOW}$NS_SUBDOMAIN${NC}"
+    echo -e "  Nameserver subdomain: ${YELLOW}$DOMAIN${NC}"
     echo -e "  MTU: ${YELLOW}$MTU_VALUE${NC}"
     echo -e "  Tunnel mode: ${YELLOW}$TUNNEL_MODE${NC}"
     echo -e "  Service user: ${YELLOW}$DNSTT_USER${NC}"
@@ -323,7 +323,7 @@ save_config() {
 # dnstt Server Configuration
 # Generated on $(date)
 
-NS_SUBDOMAIN="$NS_SUBDOMAIN"
+DOMAIN="$DOMAIN"
 MTU_VALUE="$MTU_VALUE"
 TUNNEL_MODE="$TUNNEL_MODE"
 PRIVATE_KEY_FILE="$PRIVATE_KEY_FILE"
@@ -384,7 +384,7 @@ print_success_box() {
 
     # Configuration Details
     echo -e "${header_color}Configuration Details:${reset}"
-    echo -e "  ${text_color}Nameserver subdomain: $NS_SUBDOMAIN${reset}"
+    echo -e "  ${text_color}Nameserver subdomain: $DOMAIN${reset}"
     echo -e "  ${text_color}MTU: $MTU_VALUE${reset}"
     echo -e "  ${text_color}Tunnel mode: $TUNNEL_MODE${reset}"
     echo -e "  ${text_color}Service user: $DNSTT_USER${reset}"
@@ -635,6 +635,7 @@ install_dependencies() {
 # Function to get user input
 get_user_input() {
     local existing_domain=""
+    local existing_mtu=""
     local existing_mode=""
     local existing_ss_port=""
     local existing_ss_method=""
@@ -644,6 +645,7 @@ get_user_input() {
 
     if load_existing_config; then
         existing_domain="$DOMAIN"
+        existing_mtu="$MTU_VALUE"
         existing_mode="$TUNNEL_MODE"
         # Save Shadowsocks config if it exists
         existing_ss_port="${SHADOWSOCKS_PORT:-}"
@@ -669,7 +671,7 @@ get_user_input() {
         if [[ -n "$existing_domain" ]]; then
             print_question "Enter the domain (current: $existing_domain): "
         else
-            print_question "Enter the domain (e.g., example.com): "
+            print_question "Enter the domain (e.g., s.example.com): "
         fi
         read -r DOMAIN
 
@@ -684,6 +686,23 @@ get_user_input() {
             print_error "Please enter a valid domain"
         fi
     done
+
+    # Get MTU value
+    if [[ -n "$existing_mtu" ]]; then
+        print_question "Enter MTU value (current: $existing_mtu): "
+    else
+        print_question "Enter MTU value (default: 1232): "
+    fi
+    read -r MTU_VALUE
+
+    # Use existing MTU if user just presses enter, otherwise use default
+    if [[ -z "$MTU_VALUE" ]]; then
+        if [[ -n "$existing_mtu" ]]; then
+            MTU_VALUE="$existing_mtu"
+        else
+            MTU_VALUE="1232"
+        fi
+    fi
 
     # Get tunnel mode
     while true; do
@@ -911,6 +930,7 @@ get_user_input() {
 
     print_status "Configuration:"
     print_status "  Domain: $DOMAIN"
+    print_status "  MTU: $MTU_VALUE"
     print_status "  Tunnel mode: $TUNNEL_MODE"
     if [ "$TUNNEL_MODE" = "socks" ]; then
         if [ "$SOCKS_AUTH_ENABLED" = "yes" ]; then
@@ -1006,13 +1026,13 @@ generate_keys() {
     # Generate key file names based on subdomain
     local key_prefix
     # shellcheck disable=SC2001
-    key_prefix=$(echo "$NS_SUBDOMAIN" | sed 's/\./_/g')
+    key_prefix=$(echo "$DOMAIN" | sed 's/\./_/g')
     PRIVATE_KEY_FILE="${CONFIG_DIR}/${key_prefix}_server.key"
     PUBLIC_KEY_FILE="${CONFIG_DIR}/${key_prefix}_server.pub"
 
     # Check if keys already exist for this domain
     if [[ -f "$PRIVATE_KEY_FILE" && -f "$PUBLIC_KEY_FILE" ]]; then
-        print_status "Found existing keys for domain: $NS_SUBDOMAIN"
+        print_status "Found existing keys for domain: $DOMAIN"
         print_status "  Private key: $PRIVATE_KEY_FILE"
         print_status "  Public key: $PUBLIC_KEY_FILE"
 
@@ -1023,7 +1043,7 @@ generate_keys() {
 
         print_status "Using existing keys (verified ownership and permissions)"
     else
-        print_status "Generating new keys for domain: $NS_SUBDOMAIN"
+        print_status "Generating new keys for domain: $DOMAIN"
 
         # Generate keys (run as root, then change ownership)
         dnstt-server -gen-key -privkey-file "$PRIVATE_KEY_FILE" -pubkey-file "$PUBLIC_KEY_FILE"
@@ -1530,7 +1550,7 @@ Wants=network.target
 Type=simple
 User=$DNSTT_USER
 Group=$DNSTT_USER
-ExecStart=${INSTALL_DIR}/dnstt-server -udp :${DNSTT_PORT} -privkey-file ${PRIVATE_KEY_FILE} -mtu ${MTU_VALUE} ${NS_SUBDOMAIN} 127.0.0.1:${target_port}
+ExecStart=${INSTALL_DIR}/dnstt-server -udp :${DNSTT_PORT} -privkey-file ${PRIVATE_KEY_FILE} -mtu ${MTU_VALUE} ${DOMAIN} 127.0.0.1:${target_port}
 Restart=always
 RestartSec=5
 KillMode=mixed
